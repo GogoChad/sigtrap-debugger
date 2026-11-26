@@ -1,17 +1,20 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/wait.h>
+
+#include "process.h"
 
 void welcome(void);
 void help(void);
 
 int main(void){
     char command[30];
+    const char *prompt = isatty(STDOUT_FILENO) ? "\033[31msigtrap>\033[0m " : "sigtrap> ";
     welcome();
     while (1)
     {
-        printf("sigtrap> ");
+        fputs(prompt, stdout);
+        fflush(stdout);
     if (fgets(command, sizeof(command), stdin) == NULL){
         printf("End of stream.\n");
         break;
@@ -36,31 +39,32 @@ int main(void){
             if (command[4] == '\0') {
                 printf("Input a target file.\n");
             } else {
-                const char *path = &command[4];
-                pid_t pid = fork();
-                if (pid == -1){
-                    perror("fork");
-                }
-                else if (pid == 0){
-                    execl(path, path, (char *) NULL);
-                    perror("execl");
-                    _exit(1);
-                }
-                else{
-                    if (waitpid(pid, NULL, 0) == -1){
-                        perror("waitpid");
-                    }
-                }
+                run_program(&command[4]);
             }
 
+        }
+        else if (strcmp("debug", command) == 0){
+            printf("Use debug ./target\n");
+        }
+        else if (strncmp("debug ", command, 6) == 0){
+            if (command[6] == '\0') {
+                printf("Input a target file.\n");
+            } else {
+                debug_program(&command[6]);
+            }
+        }
+        else if (strcmp("continue", command) == 0){
+            continue_program();
+        }
+        else if (strcmp("step", command) == 0){
+            step_program();
         }
         else{
             printf("Unknown command. Type help.\n");
         }
     }
     }
-    
-
+    close_debug_session();
 }
 
 void welcome(void){
@@ -68,5 +72,10 @@ void welcome(void){
 }
 
 void help(void){
-    printf("help - show all commands\nquit - exit SIGTRAP\n");
+    printf("help - show all commands\n"
+           "run <path> - run a program\n"
+           "debug <path> - start a program under the debugger\n"
+           "continue - resume the stopped program\n"
+           "step - execute one machine instruction\n"
+           "quit - exit SIGTRAP\n");
 }
